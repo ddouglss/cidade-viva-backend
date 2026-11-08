@@ -1,0 +1,51 @@
+name: cidade-viva-local
+
+services:
+  postgres:
+    image: postgres:17.11-alpine3.24
+    container_name: cidade-viva-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Defina POSTGRES_DB no arquivo .env}
+      POSTGRES_USER: ${POSTGRES_USER:?Defina POSTGRES_USER no arquivo .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no arquivo .env}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - cidade_viva_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  mosquitto:
+    image: eclipse-mosquitto:2.0.22-openssl
+    container_name: cidade-viva-mosquitto
+    restart: unless-stopped
+    environment:
+      MQTT_BACKEND_USER: ${MQTT_BACKEND_USER:?Defina MQTT_BACKEND_USER no arquivo .env}
+      MQTT_BACKEND_PASSWORD: ${MQTT_BACKEND_PASSWORD:?Defina MQTT_BACKEND_PASSWORD no arquivo .env}
+    ports:
+      - "127.0.0.1:${MQTT_PORT:-1883}:1883"
+    volumes:
+      - ./mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./mosquitto/config/acl.conf:/mosquitto/config/acl.conf:ro
+      - ./mosquitto/secrets:/mosquitto/secrets:ro
+      - cidade_viva_mosquitto_data:/mosquitto/data
+      - cidade_viva_mosquitto_log:/mosquitto/log
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_sub -h 127.0.0.1 -p 1883 -u \"$${MQTT_BACKEND_USER}\" -P \"$${MQTT_BACKEND_PASSWORD}\" -t \"cidade-viva/v1/esp32-water/status\" -E -i \"mosquitto-healthcheck\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+volumes:
+  cidade_viva_postgres_data:
+    name: cidade_viva_postgres_data
+  cidade_viva_mosquitto_data:
+    name: cidade_viva_mosquitto_data
+  cidade_viva_mosquitto_log:
+    name: cidade_viva_mosquitto_log

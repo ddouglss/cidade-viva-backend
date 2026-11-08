@@ -1,0 +1,5 @@
+root = true
+
+[**/Persistence/Migrations/*.cs]
+# EF scaffolding is generated code; application analyzers remain strict elsewhere.
+generated_code = true

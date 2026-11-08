@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><RootNamespace>CidadeViva.DeviceSimulator</RootNamespace></PropertyGroup>
+  <ItemGroup><PackageReference Include="MQTTnet" /></ItemGroup>
+</Project>

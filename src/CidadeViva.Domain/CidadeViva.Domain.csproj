@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>CidadeViva.Domain</RootNamespace>
+    <AssemblyName>CidadeViva.Domain</AssemblyName>
+  </PropertyGroup>
+</Project>
