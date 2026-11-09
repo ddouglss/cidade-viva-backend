@@ -16,15 +16,21 @@ public sealed partial class CityDispatcher(IServiceScopeFactory scopes, IOptions
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         if (!options.Value.Enabled) return;
-        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
-        while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false))
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1), clock);
+        try
         {
-            try { await TickAsync(stoppingToken).ConfigureAwait(false); }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { return; }
-            catch (Exception ex)
+            while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false))
             {
-                LogCycleFailed(logger, ex.GetType().Name);
+                try { await TickAsync(stoppingToken).ConfigureAwait(false); }
+                catch (Exception ex) when (ex is not OperationCanceledException || !stoppingToken.IsCancellationRequested)
+                {
+                    LogCycleFailed(logger, ex.GetType().Name);
+                }
             }
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            // Stopping the host cancels both the timer wait and any active cycle.
         }
     }
 

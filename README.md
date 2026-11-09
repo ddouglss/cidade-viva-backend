@@ -21,6 +21,30 @@ dotnet run --no-build --project tools/device-simulator
 
 API: `http://127.0.0.1:5080`; OpenAPI: `/openapi/v1.json`. Comandos detalhados e contrato para o frontend em [docs/api/MVP-LOCAL.md](docs/api/MVP-LOCAL.md); evidências em [docs/execution/002-EVIDENCIAS-BACKEND-MVP.md](docs/execution/002-EVIDENCIAS-BACKEND-MVP.md).
 
+### Visual Studio / F5
+
+O navegador abre automaticamente o Swagger em `http://127.0.0.1:5080/swagger`. A interface usa o documento `/openapi/v1.json` existente e está disponível em Development ou build Debug.
+
+O assistente do dashboard é opcional. As configurações e instruções de ativação estão no [recorte Gemini](docs/sdd/005-assistente-consulta.md).
+
+O perfil Development usa `http://127.0.0.1:5080`. O Visual Studio não carrega `.env` automaticamente. A API possui UserSecretsId e usa o provedor nativo User Secrets em Development. Nesta máquina, a configuração local já foi importada para esse armazenamento, fora do repositório. Em outra máquina, após inicializar o ambiente, importe as chaves com `__` do `.env`:
+
+Em compilações Debug, o carregamento de User Secrets também é explícito, mesmo sem o perfil Development. Variáveis de ambiente e argumentos prevalecem. Esse carregamento adicional não existe em Release.
+
+Debug também carrega o `.env` ignorado na raiz deste repositório, pesquisando a raiz pelo arquivo `CidadeViva.sln`. Isso permite F5 mesmo quando o armazenamento de User Secrets do Visual Studio não estiver disponível. Ordem de prioridade crescente: configuração padrão, `.env`, User Secrets, ambiente e argumentos. Release não possui esse carregamento local. Não copie `.env` para `bin`, nem adicione suas senhas a `launchSettings.json`.
+
+```powershell
+$localConfig = @{}
+foreach ($line in Get-Content .env) {
+    if ($line -match '^\s*([^#=\s]+)=(.*)$' -and $Matches[1].Contains('__')) {
+        $localConfig[$Matches[1].Replace('__', ':')] = $Matches[2].Trim()
+    }
+}
+$localConfig | ConvertTo-Json -Compress | dotnet user-secrets set --project src/CidadeViva.Api
+```
+
+Não use `user-secrets list` em logs compartilhados. Pare a depuração anterior antes de recompilar e executar novamente. Rode uma única instância da API local para evitar conflito de porta e clientId MQTT.
+
 Validação: `dotnet build CidadeViva.sln` e `dotnet test CidadeViva.sln --no-build`. Testes novos usam banco e broker isolados; não removem volumes do ambiente de desenvolvimento. Docker deve estar ativo e credenciais locais previamente configuradas.
 
 **Limites desta entrega:** configurações de irrigação são versionadas/auditadas e limitam solicitações na API, mas ficam `NOT_SENT` para a placa até contrato remoto coordenado. Hardware e integração visual do frontend continuam pendentes. Não há comprovação física de vazão, energia solar ou GPIO. Sem commit/push/deploy.
