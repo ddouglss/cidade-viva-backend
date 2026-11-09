@@ -133,7 +133,7 @@ if (builder.Configuration.GetValue<bool>("City:Enabled"))
 {
     app.MapCityEndpoints();
     GeminiAssistant.MapAssistant(app);
-    WifiProvisioningEndpoints.MapWifiEndpoints(app);
+    if (app.Environment.IsDevelopment()) WifiProvisioningEndpoints.MapWifiEndpoints(app);
 }
 
 await app.RunAsync().ConfigureAwait(false);

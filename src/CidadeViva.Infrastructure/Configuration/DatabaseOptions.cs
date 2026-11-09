@@ -17,6 +17,8 @@ public sealed class DatabaseOptions
     public string Password { get; set; } = string.Empty;
 
     public int CommandTimeoutSeconds { get; set; } = 5;
+    public SslMode SslMode { get; set; } = SslMode.Prefer;
+    public ChannelBinding ChannelBinding { get; set; } = ChannelBinding.Prefer;
 
     public string BuildConnectionString()
     {
@@ -29,7 +31,9 @@ public sealed class DatabaseOptions
             Password = Password,
             Timeout = Math.Clamp(CommandTimeoutSeconds, 1, 30),
             CommandTimeout = Math.Clamp(CommandTimeoutSeconds, 1, 30),
-            Pooling = true
+            Pooling = true,
+            SslMode = SslMode,
+            ChannelBinding = ChannelBinding
         };
 
         return builder.ConnectionString;

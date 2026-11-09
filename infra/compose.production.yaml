@@ -1,0 +1,87 @@
+x-database: &database
+  Database__Port: "5432"
+  Database__Database: ${CV_DB_NAME:-neondb}
+  Database__Username: ${CV_DB_USER:?set CV_DB_USER}
+  Database__Password: ${CV_DB_PASSWORD:?set CV_DB_PASSWORD}
+  Database__SslMode: VerifyFull
+  Database__ChannelBinding: Require
+  Database__CommandTimeoutSeconds: "20"
+
+services:
+  migrate:
+    image: ghcr.io/ddouglss/cidade-viva-backend:${CV_API_TAG:-main}
+    pull_policy: always
+    command: ["--initialize-database"]
+    environment:
+      <<: *database
+      Database__Host: ${CV_DB_DIRECT_HOST:?set CV_DB_DIRECT_HOST}
+      Bootstrap__viewer__Username: viewer
+      Bootstrap__viewer__Password: ${CV_VIEWER_PASSWORD:?set CV_VIEWER_PASSWORD}
+      Bootstrap__operator__Username: operator
+      Bootstrap__operator__Password: ${CV_OPERATOR_PASSWORD:?set CV_OPERATOR_PASSWORD}
+
+  broker:
+    image: eclipse-mosquitto:2.0.22-openssl
+    restart: unless-stopped
+    environment:
+      CV_MQTT_PASSWORD: ${CV_MQTT_PASSWORD:?set CV_MQTT_PASSWORD}
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        umask 077
+        mkdir -p /mosquitto/runtime
+        mosquitto_passwd -b -c /mosquitto/runtime/passwd cv_backend "$$CV_MQTT_PASSWORD"
+        printf '%s\n' 'user cv_backend' 'topic read cidade-viva/v1/+/telemetry' 'topic read cidade-viva/v1/+/status' 'topic read cidade-viva/v1/+/ack' 'topic write cidade-viva/v1/+/commands' > /mosquitto/runtime/acl
+        printf '%s\n' 'listener 1883' 'allow_anonymous false' 'password_file /mosquitto/runtime/passwd' 'acl_file /mosquitto/runtime/acl' 'persistence true' 'persistence_location /mosquitto/data/' > /mosquitto/runtime/mosquitto.conf
+        chown -R mosquitto:mosquitto /mosquitto/runtime /mosquitto/data
+        exec mosquitto -c /mosquitto/runtime/mosquitto.conf
+    volumes:
+      - mqtt-data:/mosquitto/data
+
+  api:
+    image: ghcr.io/ddouglss/cidade-viva-backend:${CV_API_TAG:-main}
+    pull_policy: always
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      broker:
+        condition: service_started
+    environment:
+      <<: *database
+      Database__Host: ${CV_DB_HOST:?set CV_DB_HOST}
+      City__Enabled: "true"
+      Mqtt__Host: broker
+      Mqtt__Port: "1883"
+      Mqtt__ClientId: cidade-viva-production
+      Mqtt__Username: cv_backend
+      Mqtt__Password: ${CV_MQTT_PASSWORD:?set CV_MQTT_PASSWORD}
+      Gemini__Enabled: ${CV_GEMINI_ENABLED:-false}
+      Gemini__Model: ${CV_GEMINI_MODEL:-}
+      Gemini__ApiKey: ${CV_GEMINI_API_KEY:-}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "--max-time", "8", "http://127.0.0.1:8080/api/v1/health/ready"]
+      start_period: 40s
+      interval: 10s
+      timeout: 9s
+      retries: 5
+    volumes:
+      - api-keys:/app/.keys
+
+  web:
+    image: ghcr.io/ddouglss/cidade-viva-frontend:${CV_WEB_TAG:-main}
+    pull_policy: always
+    restart: unless-stopped
+    expose: ["8080"]
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 4s
+      retries: 3
+
+volumes:
+  mqtt-data:
+  api-keys:
