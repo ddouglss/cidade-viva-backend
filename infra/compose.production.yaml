@@ -11,6 +11,7 @@ services:
   migrate:
     image: ghcr.io/ddouglss/cidade-viva-backend:${CV_API_TAG:-main}
     pull_policy: always
+    restart: "no"
     command: ["--initialize-database"]
     environment:
       <<: *database
