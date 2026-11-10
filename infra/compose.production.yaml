@@ -77,7 +77,7 @@ services:
     labels:
       - traefik.enable=true
       - traefik.http.services.cidade-viva-web.loadbalancer.server.port=8080
-      - caddy_0=http://cidadevivasmartlab.com.br, https://cidadevivasmartlab.com.br, http://www.cidadevivasmartlab.com.br, https://www.cidadevivasmartlab.com.br
+      - caddy_0=http://cidadevivasmartlab.com, https://cidadevivasmartlab.com, http://www.cidadevivasmartlab.com, https://www.cidadevivasmartlab.com
       - caddy_0.reverse_proxy={{upstreams 8080}}
     depends_on:
       api:
