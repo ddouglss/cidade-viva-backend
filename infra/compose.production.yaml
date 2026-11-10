@@ -43,6 +43,7 @@ services:
     image: ghcr.io/ddouglss/cidade-viva-backend:${CV_API_TAG:-main}
     pull_policy: always
     restart: unless-stopped
+    expose: ["8080"]
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -60,6 +61,8 @@ services:
       Gemini__Enabled: ${CV_GEMINI_ENABLED:-false}
       Gemini__Model: ${CV_GEMINI_MODEL:-}
       Gemini__ApiKey: ${CV_GEMINI_API_KEY:-}
+      Cors__Origins__0: https://cidadevivasmartlab.com
+      Cors__Origins__1: https://www.cidadevivasmartlab.com
     healthcheck:
       test: ["CMD", "curl", "-fsS", "--max-time", "8", "http://127.0.0.1:8080/api/v1/health/ready"]
       start_period: 40s

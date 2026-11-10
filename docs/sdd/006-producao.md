@@ -6,7 +6,7 @@ CI valida cada repositório. Backend e frontend publicam tags main e SHA após t
 
 ## Operação e evidências
 
-- Recurso Compose `infra/compose.production.yaml`, branch `main`, projeto Cidade Viva Smart Lab no Coolify existente. Servidor Netcup `159.195.240.96`. Rota HTTPS configurada apenas para `web:8080`.
+- Recurso Compose `infra/compose.production.yaml`, branch `main`, projeto Cidade Viva Smart Lab no Coolify existente. Servidor Netcup `159.195.240.96`. O site usa `cidadevivasmartlab.com` em `web:8080`; a API também tem `api.cidadevivasmartlab.com` em `api:8080`. O frontend encaminha REST e SignalR internamente e a API permite CORS somente dos domínios do site.
 - Configuração privada no ambiente de produção do Coolify. `CV_DB_HOST` é o endpoint Neon com pool, `CV_DB_DIRECT_HOST` é o endpoint de migração. `CV_GEMINI_MODEL=gemini-3.1-flash-lite`. Usuários bootstrap viewer/operator e credenciais da aplicação ficam em ambiente privado. Cópia local ignorada em `.env.production`.
 - Deploy de 09/11/2026 validado pelo proxy interno. Readiness 200, login de ambos os perfis, dois dispositivos semeados e resposta Gemini com duas fontes. O primeiro deploy exigiu corrigir o restart da migração. O redeploy de `67583bd` terminou em aproximadamente 24 segundos com imagens já disponíveis.
 - Cloudflare tem zona para `cidadevivasmartlab.com`. A raiz e `www` apontam para `159.195.240.96`, ambos DNS only durante emissão do certificado. Em 10/11/2026, a GoDaddy recebeu os nameservers desta zona, `keanu.ns.cloudflare.com` e `pat.ns.cloudflare.com`. Aguardar a delegação pública, validar DNS e HTTPS e então avaliar ativar o proxy Cloudflare com Full (strict). A zona antiga `.com.br` não faz parte deste deploy.
