@@ -22,6 +22,29 @@ public sealed class CityContractTests
     }
 
     [Theory]
+    [InlineData("esp32-energy", """{"schemaVersion":"1.0","messageId":"esp32-energy-abc-1","deviceId":"esp32-energy","uptimeMs":1000,"origin":"CALCULATED","quality":"INVALID","mode":"MANUAL","measurements":{},"actuators":{"mainLightOn":false}}""")]
+    [InlineData("esp32-water", """{"schemaVersion":"1.0","messageId":"esp32-water-abc-1","deviceId":"esp32-water","uptimeMs":1000,"origin":"PHYSICAL_SENSOR","quality":"UNSYNCHRONIZED_TIME","mode":"MANUAL","measurements":{"soilAdcRaw":1775,"reservoirLow":true},"actuators":{"pumpOn":false}}""")]
+    public void TelemetryOnlyFirmwarePayloadsMatchContract(string deviceKey, string payload)
+    {
+        MqttEnvelope envelope = MqttEnvelope.Parse($"cidade-viva/v1/{deviceKey}/telemetry", Encoding.UTF8.GetBytes(payload), false);
+        Assert.Equal(deviceKey, envelope.DeviceKey);
+        Assert.False(envelope.Body.TryGetProperty("timestamp", out _));
+    }
+
+    [Theory]
+    [InlineData("esp32-energy")]
+    [InlineData("esp32-water")]
+    public void RetainedFirmwareStatusAndWillMatchContract(string deviceKey)
+    {
+        foreach (bool online in new[] { true, false })
+        {
+            string payload = $$"""{"schemaVersion":"1.0","deviceId":"{{deviceKey}}","online":{{online.ToString().ToLowerInvariant()}},"firmwareVersion":"0.3.0-telemetry-only","uptimeMs":1000,"lastKnownMode":"MANUAL"}""";
+            MqttEnvelope envelope = MqttEnvelope.Parse($"cidade-viva/v1/{deviceKey}/status", Encoding.UTF8.GetBytes(payload), true);
+            Assert.Equal(online, envelope.Body.GetProperty("online").GetBoolean());
+        }
+    }
+
+    [Theory]
     [InlineData("1.0", "2.0")]
     [InlineData("SIMULATED_INPUT", "FAKE")]
     [InlineData("37.2", "101")]

@@ -24,8 +24,13 @@ services:
   broker:
     image: eclipse-mosquitto:2.0.22-openssl
     restart: unless-stopped
+    # Loopback by default; bind to an approved VPN interface only after it exists.
+    ports:
+      - "${CV_MQTT_BIND_IP:-127.0.0.1}:1883:1883"
     environment:
       CV_MQTT_PASSWORD: ${CV_MQTT_PASSWORD:?set CV_MQTT_PASSWORD}
+      CV_MQTT_ENERGY_PASSWORD: ${CV_MQTT_ENERGY_PASSWORD:-}
+      CV_MQTT_WATER_PASSWORD: ${CV_MQTT_WATER_PASSWORD:-}
     entrypoint: ["/bin/sh", "-ec"]
     command:
       - |
@@ -33,6 +38,14 @@ services:
         mkdir -p /mosquitto/runtime
         mosquitto_passwd -b -c /mosquitto/runtime/passwd cv_backend "$$CV_MQTT_PASSWORD"
         printf '%s\n' 'user cv_backend' 'topic read cidade-viva/v1/+/telemetry' 'topic read cidade-viva/v1/+/status' 'topic read cidade-viva/v1/+/ack' 'topic write cidade-viva/v1/+/commands' > /mosquitto/runtime/acl
+        if [ -n "$$CV_MQTT_ENERGY_PASSWORD" ]; then
+          mosquitto_passwd -b /mosquitto/runtime/passwd esp32-energy "$$CV_MQTT_ENERGY_PASSWORD"
+          printf '%s\n' 'user esp32-energy' 'topic write cidade-viva/v1/esp32-energy/telemetry' 'topic write cidade-viva/v1/esp32-energy/status' >> /mosquitto/runtime/acl
+        fi
+        if [ -n "$$CV_MQTT_WATER_PASSWORD" ]; then
+          mosquitto_passwd -b /mosquitto/runtime/passwd esp32-water "$$CV_MQTT_WATER_PASSWORD"
+          printf '%s\n' 'user esp32-water' 'topic write cidade-viva/v1/esp32-water/telemetry' 'topic write cidade-viva/v1/esp32-water/status' >> /mosquitto/runtime/acl
+        fi
         printf '%s\n' 'listener 1883' 'allow_anonymous false' 'password_file /mosquitto/runtime/passwd' 'acl_file /mosquitto/runtime/acl' 'persistence true' 'persistence_location /mosquitto/data/' > /mosquitto/runtime/mosquitto.conf
         chown -R mosquitto:mosquitto /mosquitto/runtime /mosquitto/data
         exec mosquitto -c /mosquitto/runtime/mosquitto.conf
