@@ -32,15 +32,38 @@ public sealed class GeminiAssistantTests
         Assert.DoesNotContain("test-key", handler.RequestBody, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task RetriesTemporaryProviderOverload()
+    {
+        var handler = new GeminiStub { FailOnce = true };
+        using var client = new HttpClient(handler);
+        using var config = new ConfigurationManager();
+        config["Gemini:Enabled"] = "true";
+        config["Gemini:ApiKey"] = "test-key";
+        config["Gemini:Model"] = "gemini-test";
+        var assistant = new GeminiAssistant(client, config, TimeProvider.System);
+
+        AssistantAnswer answer = await assistant.AskAsync(
+            new("Qual é o estado da irrigação?", "esp32-water"), new ReadOnlyCity(), CancellationToken.None);
+
+        Assert.Equal(2, handler.RequestCount);
+        Assert.Equal("O reservatório baixo é simulado.", answer.Answer);
+    }
+
     private sealed class GeminiStub : HttpMessageHandler
     {
         public string RequestBody { get; private set; } = "";
+        public bool FailOnce { get; init; }
+        public int RequestCount { get; private set; }
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
+            RequestCount++;
             Assert.Equal("https://generativelanguage.googleapis.com/v1beta/models/gemini-test:generateContent", request.RequestUri?.AbsoluteUri);
             Assert.Equal("test-key", Assert.Single(request.Headers.GetValues("x-goog-api-key")));
             RequestBody = await request.Content!.ReadAsStringAsync(cancellationToken);
+            if (FailOnce && RequestCount == 1)
+                return new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent("""{"candidates":[{"content":{"parts":[{"text":"O reservatório baixo é simulado."}]}}]}""")

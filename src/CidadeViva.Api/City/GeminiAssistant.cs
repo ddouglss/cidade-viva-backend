@@ -42,9 +42,7 @@ public sealed class GeminiAssistant(HttpClient http, IConfiguration configuratio
             alerts
         };
 
-        using var message = new HttpRequestMessage(HttpMethod.Post, $"https://generativelanguage.googleapis.com/v1beta/models/{Model}:generateContent");
-        message.Headers.Add("x-goog-api-key", Key);
-        message.Content = JsonContent.Create(new
+        var payload = new
         {
             systemInstruction = new { parts = new[] { new { text = """
                 Você é o assistente de consulta do laboratório Cidade Viva. Responda em português do Brasil, em texto breve.
@@ -56,11 +54,11 @@ public sealed class GeminiAssistant(HttpClient http, IConfiguration configuratio
                 """ } } },
             contents = new[] { new { role = "user", parts = new[] { new { text = JsonSerializer.Serialize(new { question, context }) } } } },
             generationConfig = new { maxOutputTokens = 1024 }
-        });
+        };
 
         try
         {
-            using HttpResponseMessage response = await http.SendAsync(message, ct).ConfigureAwait(false);
+            using HttpResponseMessage response = await SendWithRetryAsync(payload, ct).ConfigureAwait(false);
             if (response.StatusCode == HttpStatusCode.TooManyRequests) throw new CityRequestException(429, "ASSISTANT_QUOTA");
             if (!response.IsSuccessStatusCode) throw new CityRequestException(502, "ASSISTANT_PROVIDER_UNAVAILABLE");
             using JsonDocument result = await response.Content.ReadFromJsonAsync<JsonDocument>(ct).ConfigureAwait(false)
@@ -79,6 +77,23 @@ public sealed class GeminiAssistant(HttpClient http, IConfiguration configuratio
         catch (Exception error) when (error is HttpRequestException or JsonException or InvalidOperationException)
         {
             throw new CityRequestException(502, "ASSISTANT_PROVIDER_UNAVAILABLE");
+        }
+    }
+
+    private async Task<HttpResponseMessage> SendWithRetryAsync(object payload, CancellationToken ct)
+    {
+        for (int attempt = 0; ; attempt++)
+        {
+            using var message = new HttpRequestMessage(HttpMethod.Post,
+                $"https://generativelanguage.googleapis.com/v1beta/models/{Model}:generateContent");
+            message.Headers.Add("x-goog-api-key", Key);
+            message.Content = JsonContent.Create(payload);
+            HttpResponseMessage response = await http.SendAsync(message, ct).ConfigureAwait(false);
+            if (response.StatusCode != HttpStatusCode.ServiceUnavailable || attempt == 2)
+                return response;
+
+            response.Dispose();
+            await Task.Delay(TimeSpan.FromMilliseconds(500 * (1 << attempt)), ct).ConfigureAwait(false);
         }
     }
 
